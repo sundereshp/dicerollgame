@@ -2,7 +2,7 @@
   "name": "my-3d-app",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://username.github.io/repository-name",
+  "homepage": "https://sundereshp.github.io/dicerollgame/",
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
     "@react-three/cannon": "^6.6.0",

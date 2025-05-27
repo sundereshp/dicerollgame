@@ -60,31 +60,38 @@ const GameButton = styled.button`
 const Dice = memo(({ isRolling, onResult }) => {
     const [currentValue, setCurrentValue] = useState(1);
     const animationRef = useRef(null);
+    const hasProcessedScore = useRef(false);
 
     // Simulate dice roll animation
     useEffect(() => {
-        if (isRolling) {
-            let animationCount = 0;
-            const maxAnimations = 15; // Fixed number of animation frames
-
-            const animate = () => {
-                animationCount++;
-                setCurrentValue(Math.floor(Math.random() * 6) + 1);
-
-                if (animationCount < maxAnimations) {
-                    animationRef.current = setTimeout(animate, 80);
-                } else {
-                    // Final result
-                    const finalResult = Math.floor(Math.random() * 6) + 1;
-                    setCurrentValue(finalResult);
-                    
-                    // Call onResult with the final value
-                    onResult(finalResult);
-                }
-            };
-
-            animate();
+        if (!isRolling) {
+            hasProcessedScore.current = false;
+            return;
         }
+
+        let animationCount = 0;
+        const maxAnimations = 15;
+        let finalResult = Math.floor(Math.random() * 6) + 1;
+
+        // Update score immediately but only once
+        if (!hasProcessedScore.current) {
+            onResult(finalResult, false);
+            hasProcessedScore.current = true;
+        }
+
+        const animate = () => {
+            animationCount++;
+            setCurrentValue(Math.floor(Math.random() * 6) + 1);
+
+            if (animationCount < maxAnimations) {
+                animationRef.current = setTimeout(animate, 80);
+            } else {
+                setCurrentValue(finalResult);
+                onResult(finalResult, true);
+            }
+        };
+        
+        animate();
 
         return () => {
             if (animationRef.current) {
@@ -112,34 +119,30 @@ export default function DiceGame() {
     const [highScore, setHighScore] = useState(100);
     const [isRolling, setIsRolling] = useState(false);
 
-    const handleResult = useCallback((result) => {
-        // Calculate new score
-        const newScore = result === selectedNumber
-            ? score + (result * 10)
-            : Math.max(0, score - result);
-
-        setScore(newScore);
-
-        // Update high score if needed
-        setHighScore(prevHighScore => Math.max(prevHighScore, newScore));
-
-        // Set appropriate message
-        setMessage(result === selectedNumber
-            ? `🎉 Correct! The dice shows ${result}. +${result * 10} points!`
-            : `❌ Wrong! The dice shows ${result} (You selected ${selectedNumber}). -${result} points!`
-        );
-
-        // Reset rolling state after a small delay to show the final result
-        setTimeout(() => {
+    const handleResult = useCallback((result, isFinal = false) => {
+        if (isFinal) {
+            // Only show message when animation is complete
+            setMessage(result === selectedNumber
+                ? `🎉 Correct! The dice shows ${result}. +${result * 10} points!`
+                : `❌ Wrong! The dice shows ${result} (You selected ${selectedNumber}). -${selectedNumber} points!`
+            );
             setIsRolling(false);
-        }, 500);
+        } else {
+            // Update score without showing message
+            const newScore = result === selectedNumber
+                ? score + (result * 10)  // Correct guess: add 10x the dice value
+                : Math.max(0, score - selectedNumber);  // Wrong guess: subtract the selected number
+            
+            setScore(newScore);
+            setHighScore(prev => Math.max(prev, newScore));
+        }
     }, [selectedNumber, score]);
 
     const handleRoll = useCallback(() => {
         if (isRolling) return; // Prevent multiple rolls
         
         setIsRolling(true);
-        setMessage('🎲 Rolling...');
+        setMessage('Rolling...');
     }, [isRolling]);
 
     const handleRestart = () => {
@@ -159,22 +162,35 @@ export default function DiceGame() {
 
     return (
         <div style={{
-            height: '100vh',
-            background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%)',
-            color: 'white',
-            position: 'relative',
+            margin: 0,
+            padding: '20px',
+            minHeight: '100vh',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px'
+            backgroundColor: 'black',
+            boxSizing: 'border-box',
+            overflowX: 'hidden'
         }}>
-            <div style={{ textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
-                <h1 style={{ marginBottom: '20px' }}>🎲 Dice Game</h1>
+            <div style={{ 
+                width: '100%',
+                maxWidth: '600px',
+                margin: '0 auto',
+                padding: '20px',
+                textAlign: 'center',
+                boxSizing: 'border-box'
+            }}>
+                <h1 style={{ 
+                    margin: '0 0 20px 0', 
+                    padding: '10px 0',
+                    color: 'white'
+                }}>
+                    🎲 Dice Game
+                </h1>
 
                 {/* Score and Message */}
                 <div style={{ marginBottom: '2rem' }}>
-                    <h2 style={{ margin: '0 0 10px 0', fontSize: '24px' }}>Score: {score}</h2>
+                    <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', color: 'white' }}>Score: {score}</h2>
                     <p style={{ margin: '0 0 10px 0', color: '#ffc107' }}>High Score: {highScore}</p>
                     <p style={{
                         color: message.includes('🎉') ? '#28a745' : message.includes('❌') ? '#dc3545' : '#17a2b8',
@@ -195,7 +211,7 @@ export default function DiceGame() {
 
                 {/* Number Selection */}
                 <div style={{ marginBottom: '2rem' }}>
-                    <p style={{ marginBottom: '0.5rem', fontSize: '16px', fontWeight: 'bold' }}>
+                    <p style={{ marginBottom: '0.5rem', fontSize: '16px', fontWeight: 'bold' ,color: 'white'}}>
                         Select your number:
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '8px' }}>
@@ -214,38 +230,58 @@ export default function DiceGame() {
                 </div>
 
                 {/* Game Controls */}
-                <div style={{ marginBottom: '2rem' }}>
+                <div style={{ 
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    maxWidth: '400px',
+                    margin: '0 auto 2rem'
+                }}>
                     <GameButton
                         onClick={handleRoll}
                         disabled={isRolling}
                         className="roll-button"
                         style={{ 
-                            margin: '0 8px', 
+                            flex: '1 1 200px',
+                            minWidth: '120px',
                             fontSize: '18px',
-                            padding: '12px 24px',
-                            background: '#28a745'
+                            padding: '12px 16px',
+                            background: '#28a745',
+                            color: 'white',
+                            margin: '0'
                         }}
                     >
-                        {isRolling ? '🎲 Rolling...' : '🎲 Roll Dice'}
+                        {isRolling ? 'Rolling...' : '🎲 Roll Dice'}
                     </GameButton>
 
                     <GameButton
                         onClick={handleRestart}
                         className="restart-button"
-                        style={{ margin: '0 8px', fontSize: '16px' }}
+                        style={{ 
+                            flex: '0 1 auto',
+                            minWidth: '120px',
+                            fontSize: '16px',
+                            padding: '12px 16px',
+                            margin: '0',
+                            background: '#f44336',
+                            color: 'white'
+                        }}
                         disabled={isRolling}
                     >
-                        🔄 Restart
+                        Restart
                     </GameButton>
                 </div>
 
                 {/* Game Info */}
                 <div style={{ fontSize: '14px', color: '#aaa', marginBottom: '2rem' }}>
                     <p style={{ margin: '5px 0' }}>
-                        ✅ Correct guess: +{selectedNumber * 10} points
+                        Correct guess: +{selectedNumber * 10} points
                     </p>
                     <p style={{ margin: '5px 0' }}>
-                        ❌ Wrong guess: -{selectedNumber} points (minimum score: 0)
+                        Wrong guess: -{selectedNumber} points (minimum score: 0)
                     </p>
                 </div>
 
@@ -261,12 +297,12 @@ export default function DiceGame() {
                     borderRadius: '8px',
                     border: '1px solid rgba(255,255,255,0.1)'
                 }}>
-                    <h4 style={{ margin: '0 0 10px 0', color: '#fff' }}>📋 How to Play:</h4>
+                    <h4 style={{ margin: '0 0 10px 0', color: '#fff' }}>How to Play:</h4>
                     <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.4' }}>
                         <li>Select a number from 1 to 6</li>
                         <li>Click "Roll Dice" to roll once</li>
                         <li>If you guess correctly, earn points equal to the number × 10</li>
-                        <li>If you guess wrong, lose points equal to the dice result</li>
+                        <li>If you guess wrong, lose points equal to the selected number</li>
                         <li>Your score cannot go below 0</li>
                         <li>Try to achieve the highest score possible!</li>
                     </ul>
